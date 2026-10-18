@@ -8,9 +8,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
@@ -21,13 +23,14 @@ import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import com.meesho.gst.config.SecurityConfig;
 import com.meesho.gst.util.JwtUtil;
 import com.meesho.gst.service.UserService;
 import com.meesho.gst.config.OAuth2AuthenticationSuccessHandler;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
 
 @WebMvcTest(GstConversionController.class)
-@AutoConfigureMockMvc(addFilters = false)
+@Import(SecurityConfig.class)
 class GstConversionControllerTest {
 
     @Autowired
@@ -45,8 +48,31 @@ class GstConversionControllerTest {
     @MockBean
     private OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
 
+    @MockBean
+    private ClientRegistrationRepository clientRegistrationRepository;
+
     @Test
-    @DisplayName("POST /api/v1/gst/convert-meesho returns 200 and downloadable GSTR-1 JSON file attachment")
+    @DisplayName("POST /api/v1/gst/convert-meesho returns 401 when not authenticated")
+    void testConvertMeeshoUnauthenticated() throws Exception {
+        MockMultipartFile tcsSales = new MockMultipartFile(
+                "tcs_sales", "tcs_sales.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "dummy content".getBytes()
+        );
+
+        mockMvc.perform(multipart("/api/v1/gst/convert-meesho")
+                        .file(tcsSales)
+                        .param("gstin", "29AABCU9603R1ZX")
+                        .param("period", "072026")
+                        .param("sellerStateCode", "29")
+                        .with(org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf())
+                )
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/gst/convert-meesho returns 200 when authenticated")
+    @WithMockUser
     void testConvertMeeshoSuccess() throws Exception {
         MockMultipartFile tcsSales = new MockMultipartFile(
                 "tcs_sales", "tcs_sales.xlsx",
@@ -97,6 +123,7 @@ class GstConversionControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/gst/convert-meesho returns 400 when required file is missing")
+    @WithMockUser
     void testConvertMeeshoMissingFileReturns400() throws Exception {
         mockMvc.perform(multipart("/api/v1/gst/convert-meesho")
                         .param("gstin", "29AABCU9603R1ZX")
@@ -110,6 +137,7 @@ class GstConversionControllerTest {
 
     @Test
     @DisplayName("POST /api/v1/gst/convert-meesho returns 400 when required parameter is missing")
+    @WithMockUser
     void testConvertMeeshoMissingParamReturns400() throws Exception {
         MockMultipartFile tcsSales = new MockMultipartFile(
                 "tcs_sales", "tcs_sales.xlsx",

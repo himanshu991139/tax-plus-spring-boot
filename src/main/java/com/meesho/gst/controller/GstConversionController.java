@@ -21,7 +21,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.charset.StandardCharsets;
 
 /**
- * REST Controller exposing public endpoints for converting Meesho Excel reports into official GSTR-1 JSON.
+ * REST Controller for converting Meesho Excel reports into official GSTR-1 JSON.
+ * All endpoints require authentication.
  */
 @CrossOrigin(origins = "*")
 @RestController
