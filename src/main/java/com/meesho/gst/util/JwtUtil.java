@@ -20,7 +20,7 @@ public class JwtUtil {
     private final long expirationMs;
 
     public JwtUtil(
-            @Value("${jwt.secret}") String secret,
+            @Value("${jwt.secret:taxpulse-jwt-super-secret-key-for-development-32bytes}") String secret,
             @Value("${jwt.expiration:86400000}") long expirationMs) {
         byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
         if (keyBytes.length < 32) {
