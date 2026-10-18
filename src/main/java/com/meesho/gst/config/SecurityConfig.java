@@ -25,12 +25,15 @@ public class SecurityConfig {
      * without a Google project), avoiding the "ClientRegistrationRepository not found" startup error.
      */
     private final boolean oauth2Enabled;
+    private final String frontendUrl;
 
     public SecurityConfig(
             OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler,
-            @Value("${spring.security.oauth2.client.registration.google.client-id:}") String googleClientId) {
+            @Value("${spring.security.oauth2.client.registration.google.client-id:}") String googleClientId,
+            @Value("${FRONTEND_URL:http://localhost:4200}") String frontendUrl) {
         this.oAuth2AuthenticationSuccessHandler = oAuth2AuthenticationSuccessHandler;
         this.oauth2Enabled = googleClientId != null && !googleClientId.isBlank();
+        this.frontendUrl = frontendUrl;
     }
 
     @Bean
@@ -92,7 +95,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        configuration.setAllowedOrigins(List.of(frontendUrl));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

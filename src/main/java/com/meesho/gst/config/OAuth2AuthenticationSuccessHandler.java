@@ -11,6 +11,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -25,10 +26,13 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     private final JwtUtil jwtUtil;
     private final UserService userService;
+    private final String frontendUrl;
 
-    public OAuth2AuthenticationSuccessHandler(JwtUtil jwtUtil, UserService userService) {
+    public OAuth2AuthenticationSuccessHandler(JwtUtil jwtUtil, UserService userService,
+                                               @Value("${FRONTEND_URL:http://localhost:4200}") String frontendUrl) {
         this.jwtUtil = jwtUtil;
         this.userService = userService;
+        this.frontendUrl = frontendUrl;
     }
 
     @Override
@@ -60,7 +64,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
         String token = jwtUtil.generateToken(claims);
 
-        String targetUrl = UriComponentsBuilder.fromUriString("http://localhost:4200/app/profiles")
+        String targetUrl = UriComponentsBuilder.fromUriString(frontendUrl + "/app/profiles")
                 .queryParam("token", token)
                 .build().toUriString();
 

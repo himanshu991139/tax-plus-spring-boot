@@ -37,12 +37,14 @@ class OAuth2AuthenticationSuccessHandlerTest {
     private OAuth2User oAuth2User;
 
     private OAuth2AuthenticationSuccessHandler successHandler;
+
+    private static final String FRONTEND_URL = "http://localhost:4200";
     private MockHttpServletRequest request;
     private MockHttpServletResponse response;
 
     @BeforeEach
     void setUp() {
-        successHandler = new OAuth2AuthenticationSuccessHandler(jwtUtil, userService);
+        successHandler = new OAuth2AuthenticationSuccessHandler(jwtUtil, userService, FRONTEND_URL);
         request = new MockHttpServletRequest();
         response = new MockHttpServletResponse();
     }
