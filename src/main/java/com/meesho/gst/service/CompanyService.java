@@ -37,7 +37,6 @@ public class CompanyService {
         }
         Company company = new Company();
         company.setCompanyName(dto.getCompanyName());
-        company.setOwnerName(dto.getOwnerName());
         company.setGstin(dto.getGstin());
         company.setUserEmail(email);
 

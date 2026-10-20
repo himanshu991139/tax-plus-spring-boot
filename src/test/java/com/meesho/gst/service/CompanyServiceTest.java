@@ -166,7 +166,6 @@ class CompanyServiceTest {
     private CompanyDto companyDto() {
         CompanyDto dto = new CompanyDto();
         dto.setCompanyName("Acme");
-        dto.setOwnerName("Ada");
         dto.setGstin("29AABCU9603R1ZX");
         return dto;
     }

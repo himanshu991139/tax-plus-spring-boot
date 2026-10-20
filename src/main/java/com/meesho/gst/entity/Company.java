@@ -15,9 +15,6 @@ public class Company {
     @Column(name = "company_name", nullable = false)
     private String companyName;
 
-    @Column(name = "owner_name", nullable = false)
-    private String ownerName;
-
     @Column(name = "gstin", nullable = false, unique = true)
     private String gstin;
 
@@ -40,8 +37,6 @@ public class Company {
     public void setId(Long id) { this.id = id; }
     public String getCompanyName() { return companyName; }
     public void setCompanyName(String companyName) { this.companyName = companyName; }
-    public String getOwnerName() { return ownerName; }
-    public void setOwnerName(String ownerName) { this.ownerName = ownerName; }
     public String getGstin() { return gstin; }
     public void setGstin(String gstin) { this.gstin = gstin; }
     public String getUserEmail() { return userEmail; }
