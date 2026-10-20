@@ -40,6 +40,12 @@ class GstConversionControllerTest {
     private MeeshoGstr1Service meeshoGstr1Service;
 
     @MockBean
+    private com.meesho.gst.service.AmazonGstr1Service amazonGstr1Service;
+
+    @MockBean
+    private com.meesho.gst.service.GstCombineService gstCombineService;
+
+    @MockBean
     private JwtUtil jwtUtil;
 
     @MockBean
