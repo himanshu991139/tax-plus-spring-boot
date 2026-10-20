@@ -136,8 +136,8 @@ public class MeeshoGstr1Service {
 
             if (isIntra) {
                 item.setSply_ty("INTRA");
-                double camt = round(netTax / 2.0, 2);
-                double samt = round(netTax - camt, 2);
+                double camt = round(bucket.camt, 2);
+                double samt = round(bucket.samt, 2);
                 item.setCamt(camt);
                 item.setSamt(samt);
                 item.setIamt(null); // Omitted in INTRA
@@ -544,6 +544,11 @@ public class MeeshoGstr1Service {
         ValueAccumulator b2csAcc = b2csMap.computeIfAbsent(b2csKey, k -> new ValueAccumulator());
         b2csAcc.taxableValue += txval;
         b2csAcc.taxAmount += tax;
+        if (isIntra) {
+            double half = tax / 2.0;
+            b2csAcc.camt += half;
+            b2csAcc.samt += (tax - half);
+        }
 
         // 2. Table 12: HSN
         HsnRateKey hsnKey = new HsnRateKey(hsnCode, rate);
@@ -903,6 +908,8 @@ public class MeeshoGstr1Service {
     private static class ValueAccumulator {
         double taxableValue = 0.0;
         double taxAmount = 0.0;
+        double camt = 0.0;
+        double samt = 0.0;
     }
 
     private static class HsnAccumulator {
