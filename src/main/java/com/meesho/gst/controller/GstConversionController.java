@@ -286,4 +286,179 @@ public class GstConversionController {
 
         return new ResponseEntity<>(jsonBytes, headers, HttpStatus.OK);
     }
+
+    /**
+     * Converts Meesho forward sales, return, and tax invoice Excel reports into a valid Quarterly GSTR-1 JSON (QRMP).
+     */
+    @PostMapping(
+            value = {"/convert-meesho-quarterly", "/quarterly/convert-meesho"},
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(
+            summary = "Convert Meesho Excel reports into Quarterly GSTR-1 JSON (QRMP)",
+            description = "Consolidates and validates Meesho reports across all 3 months of the selected quarter (Q1..Q4) " +
+                    "and generates an official Quarterly GSTR-1 JSON return ready for filing."
+    )
+    public ResponseEntity<byte[]> convertMeeshoQuarterly(
+            @Parameter(description = "Meesho TCS Sales Excel report (.xlsx) - Forward Orders", required = true)
+            @RequestParam("tcs_sales") MultipartFile tcsSales,
+
+            @Parameter(description = "Meesho TCS Sales Return Excel report (.xlsx) - Returns/RTO", required = false)
+            @RequestParam(value = "tcs_sales_return", required = false) MultipartFile tcsSalesReturn,
+
+            @Parameter(description = "Meesho Tax Invoice Details Excel report (.xlsx) - Document Series", required = false)
+            @RequestParam(value = "tax_invoice_details", required = false) MultipartFile taxInvoiceDetails,
+
+            @Parameter(description = "Seller GSTIN (15-character alphanumeric)", required = true)
+            @RequestParam("gstin") String gstin,
+
+            @Parameter(description = "Filing Period in MMYYYY format (e.g. 092026 for Q2) or Quarter Code", required = true)
+            @RequestParam("period") String period,
+
+            @Parameter(description = "Quarter identifier e.g. Q1, Q2, Q3, Q4 (optional)", required = false)
+            @RequestParam(value = "quarter", required = false) String quarter,
+
+            @Parameter(description = "Seller 2-digit GST State Code (e.g. 09)", required = true)
+            @RequestParam("sellerStateCode") String sellerStateCode
+    ) {
+        log.info("Received convert-meesho-quarterly request for GSTIN: {}, Period: {}, Quarter: {}, SellerStateCode: {}",
+                gstin, period, quarter, sellerStateCode);
+
+        String jsonContent = meeshoGstr1Service.convertToGstr1JsonStringQuarterly(
+                tcsSales,
+                tcsSalesReturn,
+                taxInvoiceDetails,
+                gstin,
+                period,
+                quarter,
+                sellerStateCode
+        );
+
+        byte[] jsonBytes = jsonContent.getBytes(StandardCharsets.UTF_8);
+        String filename = "GSTR1_Meesho_Quarterly_" + period.trim() + ".json";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setContentLength(jsonBytes.length);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename);
+
+        return new ResponseEntity<>(jsonBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Converts Amazon MTR (Merchant Tax Report) B2C report into a valid Quarterly GSTR-1 JSON (QRMP).
+     */
+    @PostMapping(
+            value = {"/convert-amazon-quarterly", "/quarterly/convert-amazon"},
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(
+            summary = "Convert Amazon MTR report into Quarterly GSTR-1 JSON (QRMP)",
+            description = "Consolidates and validates Amazon MTR records across all months of the selected quarter " +
+                    "and generates an official Quarterly GSTR-1 JSON return ready for filing."
+    )
+    public ResponseEntity<byte[]> convertAmazonQuarterly(
+            @Parameter(description = "Amazon Merchant Tax Report (MTR) file (.csv or .xlsx)", required = false)
+            @RequestParam(value = "mtr_file", required = false) MultipartFile mtrFile,
+
+            @Parameter(description = "Amazon MTR alias parameter name 'mtr'", required = false)
+            @RequestParam(value = "mtr", required = false) MultipartFile mtr,
+
+            @Parameter(description = "Seller GSTIN (15-character alphanumeric)", required = true)
+            @RequestParam("gstin") String gstin,
+
+            @Parameter(description = "Filing Period in MMYYYY format (e.g. 092026 for Q2) or Quarter Code", required = true)
+            @RequestParam("period") String period,
+
+            @Parameter(description = "Quarter identifier e.g. Q1, Q2, Q3, Q4 (optional)", required = false)
+            @RequestParam(value = "quarter", required = false) String quarter,
+
+            @Parameter(description = "Seller 2-digit GST State Code (e.g. 09)", required = true)
+            @RequestParam("sellerStateCode") String sellerStateCode
+    ) {
+        MultipartFile effectiveFile = mtrFile != null ? mtrFile : mtr;
+        if (effectiveFile == null || effectiveFile.isEmpty()) {
+            throw new IllegalArgumentException("Amazon MTR file (parameter 'mtr_file' or 'mtr') is required.");
+        }
+
+        log.info("Received convert-amazon-quarterly request for GSTIN: {}, Period: {}, Quarter: {}, SellerStateCode: {}, File: {}",
+                gstin, period, quarter, sellerStateCode, effectiveFile.getOriginalFilename());
+
+        String jsonContent = amazonGstr1Service.convertToGstr1JsonStringQuarterly(
+                effectiveFile,
+                gstin,
+                period,
+                quarter,
+                sellerStateCode
+        );
+
+        byte[] jsonBytes = jsonContent.getBytes(StandardCharsets.UTF_8);
+        String filename = "GSTR1_Amazon_Quarterly_" + period.trim() + ".json";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setContentLength(jsonBytes.length);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename);
+
+        return new ResponseEntity<>(jsonBytes, headers, HttpStatus.OK);
+    }
+
+    /**
+     * Multipart endpoint to convert and combine Meesho and Amazon for Quarterly returns (QRMP).
+     */
+    @PostMapping(
+            value = {"/convert-combined-quarterly", "/quarterly/convert-combined"},
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(
+            summary = "Upload and combine Meesho and Amazon files for Quarterly returns",
+            description = "Consolidates Meesho and Amazon quarterly reports into a unified Quarterly GSTR-1 return."
+    )
+    public ResponseEntity<byte[]> convertCombinedQuarterly(
+            @RequestParam(value = "tcs_sales", required = false) MultipartFile tcsSales,
+            @RequestParam(value = "tcs_sales_return", required = false) MultipartFile tcsSalesReturn,
+            @RequestParam(value = "tax_invoice_details", required = false) MultipartFile taxInvoiceDetails,
+            @RequestParam(value = "mtr_file", required = false) MultipartFile mtrFile,
+            @RequestParam(value = "mtr", required = false) MultipartFile mtr,
+            @RequestParam("gstin") String gstin,
+            @RequestParam("period") String period,
+            @RequestParam(value = "quarter", required = false) String quarter,
+            @RequestParam("sellerStateCode") String sellerStateCode
+    ) {
+        MultipartFile effectiveMtr = mtrFile != null ? mtrFile : mtr;
+
+        boolean hasMeesho = tcsSales != null && !tcsSales.isEmpty();
+        boolean hasAmazon = effectiveMtr != null && !effectiveMtr.isEmpty();
+
+        if (!hasMeesho && !hasAmazon) {
+            throw new IllegalArgumentException("Either Meesho report (tcs_sales) or Amazon report (mtr_file) must be uploaded.");
+        }
+
+        Gstr1Payload meeshoPayload = null;
+        if (hasMeesho) {
+            meeshoPayload = meeshoGstr1Service.processReportsQuarterly(tcsSales, tcsSalesReturn, taxInvoiceDetails, gstin, period, quarter, sellerStateCode);
+        }
+
+        Gstr1Payload amazonPayload = null;
+        if (hasAmazon) {
+            amazonPayload = amazonGstr1Service.processReportQuarterly(effectiveMtr, gstin, period, quarter, sellerStateCode);
+        }
+
+        Gstr1Payload result = gstCombineService.combine(meeshoPayload, amazonPayload);
+        String jsonContent = gstCombineService.serializePayload(result);
+        byte[] jsonBytes = jsonContent.getBytes(StandardCharsets.UTF_8);
+
+        String prefix = hasMeesho && hasAmazon ? "Combined" : (hasMeesho ? "Meesho" : "Amazon");
+        String filename = "GSTR1_" + prefix + "_Quarterly_" + period.trim() + ".json";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setContentLength(jsonBytes.length);
+        headers.set(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename);
+
+        return new ResponseEntity<>(jsonBytes, headers, HttpStatus.OK);
+    }
 }

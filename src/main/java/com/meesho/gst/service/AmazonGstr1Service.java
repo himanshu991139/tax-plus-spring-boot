@@ -68,6 +68,18 @@ public class AmazonGstr1Service {
     }
 
     /**
+     * Converts uploaded Amazon MTR report into GSTR-1 JSON string for Quarterly returns (QRMP scheme).
+     */
+    public String convertToGstr1JsonStringQuarterly(MultipartFile mtrFile,
+                                                    String gstin,
+                                                    String period,
+                                                    String quarter,
+                                                    String sellerStateCode) {
+        Gstr1Payload payload = processReportQuarterly(mtrFile, gstin, period, quarter, sellerStateCode);
+        return serializePayload(payload);
+    }
+
+    /**
      * Core processing logic handling validations, Table 7 (B2CS), Table 12 (HSN),
      * Table 14 (supeco), and Table 13 (doc_issue) for Amazon MTR data.
      */
@@ -84,6 +96,36 @@ public class AmazonGstr1Service {
         int expectedMonth = Integer.parseInt(normalizedPeriod.substring(0, 2));
         int expectedYear = Integer.parseInt(normalizedPeriod.substring(2, 6));
 
+        return executeProcessing(mtrFile, normalizedGstin, normalizedPeriod, normalizedSellerState, expectedMonth, expectedYear);
+    }
+
+    /**
+     * Quarterly processing for Amazon MTR data.
+     */
+    public Gstr1Payload processReportQuarterly(MultipartFile mtrFile,
+                                              String gstin,
+                                              String period,
+                                              String quarter,
+                                              String sellerStateCode) {
+        MeeshoGstr1Service.QuarterInfo qi = MeeshoGstr1Service.resolveQuarterInfo(period, quarter);
+        validateInputs(gstin, qi.fp, sellerStateCode, mtrFile);
+
+        String normalizedGstin = gstin.trim().toUpperCase();
+        String normalizedPeriod = qi.fp;
+        String normalizedSellerState = StateCodeUtil.resolveStateCode(sellerStateCode);
+
+        int expectedYear = qi.year;
+        int expectedMonth = Integer.parseInt(qi.fp.substring(0, 2));
+
+        return executeProcessing(mtrFile, normalizedGstin, normalizedPeriod, normalizedSellerState, expectedMonth, expectedYear);
+    }
+
+    private Gstr1Payload executeProcessing(MultipartFile mtrFile,
+                                          String normalizedGstin,
+                                          String normalizedPeriod,
+                                          String normalizedSellerState,
+                                          int expectedMonth,
+                                          int expectedYear) {
         // Parse MTR rows (either CSV or Excel)
         List<AmazonMtrRecord> records = parseMtrRecords(mtrFile, normalizedGstin, expectedMonth, expectedYear, normalizedPeriod);
 

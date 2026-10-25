@@ -160,4 +160,90 @@ class GstConversionControllerTest {
                 .andExpect(jsonPath("$.error").value("Bad Request"))
                 .andExpect(jsonPath("$.message").value("Required parameter 'gstin' is missing"));
     }
+
+    @Test
+    @DisplayName("POST /api/v1/gst/convert-meesho-quarterly returns 200 with quarterly filename when authenticated")
+    @WithMockUser
+    void testConvertMeeshoQuarterlySuccess() throws Exception {
+        MockMultipartFile tcsSales = new MockMultipartFile(
+                "tcs_sales", "tcs_sales.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "dummy content".getBytes()
+        );
+
+        String sampleJson = """
+                {
+                  "gstin": "29AABCU9603R1ZX",
+                  "fp": "092026",
+                  "gfp": "092026",
+                  "b2cs": [
+                    {
+                      "sply_ty": "INTER",
+                      "pos": "27",
+                      "typ": "OE",
+                      "rt": 18.0,
+                      "txval": 15000.0,
+                      "iamt": 2700.0,
+                      "camt": 0.0,
+                      "samt": 0.0,
+                      "csamt": 0.0
+                    }
+                  ]
+                }
+                """;
+
+        when(meeshoGstr1Service.convertToGstr1JsonStringQuarterly(
+                any(), any(), any(),
+                eq("29AABCU9603R1ZX"), eq("092026"), eq("Q2"), eq("29")
+        )).thenReturn(sampleJson);
+
+        mockMvc.perform(multipart("/api/v1/gst/convert-meesho-quarterly")
+                        .file(tcsSales)
+                        .param("gstin", "29AABCU9603R1ZX")
+                        .param("period", "092026")
+                        .param("quarter", "Q2")
+                        .param("sellerStateCode", "29"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=GSTR1_Meesho_Quarterly_092026.json"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.gstin").value("29AABCU9603R1ZX"))
+                .andExpect(jsonPath("$.fp").value("092026"))
+                .andExpect(jsonPath("$.b2cs[0].txval").value(15000.0));
+    }
+
+    @Test
+    @DisplayName("POST /api/v1/gst/convert-amazon-quarterly returns 200 with quarterly filename when authenticated")
+    @WithMockUser
+    void testConvertAmazonQuarterlySuccess() throws Exception {
+        MockMultipartFile mtrFile = new MockMultipartFile(
+                "mtr_file", "mtr.csv",
+                "text/csv",
+                "dummy content".getBytes()
+        );
+
+        String sampleJson = """
+                {
+                  "gstin": "29AABCU9603R1ZX",
+                  "fp": "092026",
+                  "b2cs": []
+                }
+                """;
+
+        when(amazonGstr1Service.convertToGstr1JsonStringQuarterly(
+                any(),
+                eq("29AABCU9603R1ZX"), eq("092026"), eq("Q2"), eq("29")
+        )).thenReturn(sampleJson);
+
+        mockMvc.perform(multipart("/api/v1/gst/convert-amazon-quarterly")
+                        .file(mtrFile)
+                        .param("gstin", "29AABCU9603R1ZX")
+                        .param("period", "092026")
+                        .param("quarter", "Q2")
+                        .param("sellerStateCode", "29"))
+                .andExpect(status().isOk())
+                .andExpect(header().string(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=GSTR1_Amazon_Quarterly_092026.json"))
+                .andExpect(content().contentType(MediaType.APPLICATION_JSON))
+                .andExpect(jsonPath("$.gstin").value("29AABCU9603R1ZX"))
+                .andExpect(jsonPath("$.fp").value("092026"));
+    }
 }
