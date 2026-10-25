@@ -82,13 +82,13 @@ public class GstCombineService {
             if ("INTRA".equalsIgnoreCase(bucket.splyTy)) {
                 item.setSply_ty("INTRA");
                 double calculatedHalf = round(netTxval * (bucket.rate.doubleValue() / 200.0), 2);
-                item.setCamt(Math.max(round(bucket.camt, 2), calculatedHalf));
-                item.setSamt(Math.max(round(bucket.samt, 2), calculatedHalf));
+                item.setCamt(bucket.camt != 0.0 ? round(bucket.camt, 2) : calculatedHalf);
+                item.setSamt(bucket.samt != 0.0 ? round(bucket.samt, 2) : calculatedHalf);
                 item.setIamt(null);
             } else {
                 item.setSply_ty("INTER");
                 double calculatedTax = round(netTxval * (bucket.rate.doubleValue() / 100.0), 2);
-                item.setIamt(Math.max(round(bucket.iamt, 2), calculatedTax));
+                item.setIamt(bucket.iamt != 0.0 ? round(bucket.iamt, 2) : calculatedTax);
                 item.setCamt(null);
                 item.setSamt(null);
             }

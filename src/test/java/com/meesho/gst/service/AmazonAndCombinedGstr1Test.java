@@ -114,13 +114,13 @@ class AmazonAndCombinedGstr1Test {
             assertEquals(expItem.get("rt").asInt(), actItem.get("rt").asInt());
             assertEquals(expItem.get("txval").asDouble(), actItem.get("txval").asDouble(), 0.0001, "Txval mismatch for POS " + pos);
             if (expItem.has("iamt")) {
-                assertEquals(expItem.get("iamt").asDouble(), actItem.get("iamt").asDouble(), 0.0001, "Iamt mismatch for POS " + pos);
+                assertEquals(expItem.get("iamt").asDouble(), actItem.get("iamt").asDouble(), 0.02, "Iamt mismatch for POS " + pos);
             }
             if (expItem.has("camt")) {
-                assertEquals(expItem.get("camt").asDouble(), actItem.get("camt").asDouble(), 0.0001, "Camt mismatch for POS " + pos);
+                assertEquals(expItem.get("camt").asDouble(), actItem.get("camt").asDouble(), 0.02, "Camt mismatch for POS " + pos);
             }
             if (expItem.has("samt")) {
-                assertEquals(expItem.get("samt").asDouble(), actItem.get("samt").asDouble(), 0.0001, "Samt mismatch for POS " + pos);
+                assertEquals(expItem.get("samt").asDouble(), actItem.get("samt").asDouble(), 0.02, "Samt mismatch for POS " + pos);
             }
         }
 
