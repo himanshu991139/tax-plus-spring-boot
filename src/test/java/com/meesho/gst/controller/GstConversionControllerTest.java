@@ -158,7 +158,7 @@ class GstConversionControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
                 .andExpect(jsonPath("$.error").value("Bad Request"))
-                .andExpect(jsonPath("$.message").value("Required parameter 'gstin' is missing"));
+                .andExpect(jsonPath("$.message").value("Required parameter 'gstin' is missing."));
     }
 
     @Test

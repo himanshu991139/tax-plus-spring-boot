@@ -291,4 +291,63 @@ class MeeshoGstr1ServiceTest {
         assertThrows(IllegalArgumentException.class, () ->
                 service.processReports(emptyFile, null, null, "29AABCU9603R1ZX", "072026", "29"));
     }
+
+    @Test
+    @DisplayName("Quarterly validation: July period rejects August file with month mismatch error")
+    void testQuarterlyJulyRejectsAugustFile() {
+        String csvContent = """
+                gstin,end_customer_state_new,gst_rate,total_taxable_sale_value,tax_amount,month_number
+                29AABCU9603R1ZX,Karnataka,18.0,1000.0,180.0,8
+                """;
+
+        MockMultipartFile file = new MockMultipartFile(
+                "tcs_sales", "tcs_sales.csv", "text/csv",
+                csvContent.getBytes()
+        );
+
+        // Uploading for July (072026) in Q2 with an August file (month_number = 8)
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.processReportsQuarterly(file, null, null, "29AABCU9603R1ZX", "072026", "Q2", "29"));
+
+        assertTrue(ex.getMessage().contains("Filing month mismatch"));
+        assertTrue(ex.getMessage().contains("expected July (month 7)"));
+        assertTrue(ex.getMessage().contains("found month_number 8"));
+    }
+
+    @Test
+    @DisplayName("Quarterly validation: July period accepts July file")
+    void testQuarterlyJulyAcceptsJulyFile() {
+        String csvContent = """
+                gstin,end_customer_state_new,gst_rate,total_taxable_sale_value,tax_amount,month_number
+                29AABCU9603R1ZX,Karnataka,18.0,1000.0,180.0,7
+                """;
+
+        MockMultipartFile file = new MockMultipartFile(
+                "tcs_sales", "tcs_sales.csv", "text/csv",
+                csvContent.getBytes()
+        );
+
+        Gstr1Payload payload = service.processReportsQuarterly(
+                file, null, null, "29AABCU9603R1ZX", "072026", "Q2", "29");
+
+        assertNotNull(payload);
+        assertEquals("092026", payload.getFp());
+        assertEquals(1, payload.getB2cs().size());
+    }
+
+    @Test
+    @DisplayName("Quarterly validation: Period month not in quarter throws mismatch error")
+    void testQuarterlyMonthNotInQuarter() {
+        MockMultipartFile emptyFile = new MockMultipartFile(
+                "tcs_sales", "tcs_sales.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                new byte[10]
+        );
+
+        // January (012026) in Q2 (Jul-Sep)
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                service.processReportsQuarterly(emptyFile, null, null, "29AABCU9603R1ZX", "012026", "Q2", "29"));
+
+        assertTrue(ex.getMessage().contains("does not belong to quarter Q2"));
+    }
 }

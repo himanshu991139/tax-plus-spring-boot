@@ -94,14 +94,38 @@ public class MeeshoGstr1Service {
         public final String fp;
         public final int year;
         public final String label;
+        public final String effectivePeriod;
 
         public QuarterInfo(String quarterCode, Set<Integer> allowedMonths, String fp, int year, String label) {
+            this(quarterCode, allowedMonths, fp, year, label, fp);
+        }
+
+        public QuarterInfo(String quarterCode, Set<Integer> allowedMonths, String fp, int year, String label, String effectivePeriod) {
             this.quarterCode = quarterCode;
             this.allowedMonths = allowedMonths;
             this.fp = fp;
             this.year = year;
             this.label = label;
+            this.effectivePeriod = effectivePeriod;
         }
+    }
+
+    public static String getMonthName(int month) {
+        return switch (month) {
+            case 1 -> "July".equals("July") ? "January" : "January";
+            case 2 -> "February";
+            case 3 -> "March";
+            case 4 -> "April";
+            case 5 -> "May";
+            case 6 -> "June";
+            case 7 -> "July";
+            case 8 -> "August";
+            case 9 -> "September";
+            case 10 -> "October";
+            case 11 -> "November";
+            case 12 -> "December";
+            default -> "month " + month;
+        };
     }
 
     public static QuarterInfo resolveQuarterInfo(String period, String quarterParam) {
@@ -147,41 +171,60 @@ public class MeeshoGstr1Service {
             }
         }
 
-        Set<Integer> allowedMonths;
+        Set<Integer> quarterMonths;
         String endMonthStr;
-        String label;
+        String quarterLabel;
 
         switch (q) {
             case "Q1":
-                allowedMonths = Set.of(4, 5, 6);
+                quarterMonths = Set.of(4, 5, 6);
                 endMonthStr = "06";
-                label = "Quarter 1 (Apr - Jun)";
+                quarterLabel = "Quarter 1 (Apr - Jun)";
                 break;
             case "Q2":
-                allowedMonths = Set.of(7, 8, 9);
+                quarterMonths = Set.of(7, 8, 9);
                 endMonthStr = "09";
-                label = "Quarter 2 (Jul - Sep)";
+                quarterLabel = "Quarter 2 (Jul - Sep)";
                 break;
             case "Q3":
-                allowedMonths = Set.of(10, 11, 12);
+                quarterMonths = Set.of(10, 11, 12);
                 endMonthStr = "12";
-                label = "Quarter 3 (Oct - Dec)";
+                quarterLabel = "Quarter 3 (Oct - Dec)";
                 break;
             case "Q4":
-                allowedMonths = Set.of(1, 2, 3);
+                quarterMonths = Set.of(1, 2, 3);
                 endMonthStr = "03";
-                label = "Quarter 4 (Jan - Mar)";
+                quarterLabel = "Quarter 4 (Jan - Mar)";
                 break;
             default:
-                allowedMonths = Set.of(7, 8, 9);
+                quarterMonths = Set.of(7, 8, 9);
                 endMonthStr = "09";
-                label = "Quarter 2 (Jul - Sep)";
+                quarterLabel = "Quarter 2 (Jul - Sep)";
                 q = "Q2";
                 break;
         }
 
+        Set<Integer> allowedMonths = quarterMonths;
+        String label = quarterLabel;
+        String effectivePeriod = p.isEmpty() ? String.format("%s%04d", endMonthStr, y) : p;
+
+        // If the period specifies an exact month within the quarter (e.g. 072026 for July in Q2),
+        // enforce that only that specific month's data is accepted.
+        if (p.length() == 6 && p.matches("^\\d{6}$")) {
+            int mm = Integer.parseInt(p.substring(0, 2));
+            if (mm >= 1 && mm <= 12) {
+                if (quarterMonths.contains(mm)) {
+                    allowedMonths = Collections.singleton(mm);
+                    label = getMonthName(mm) + " (month " + mm + ")";
+                } else {
+                    throw new IllegalArgumentException("Period '" + p + "' (" + getMonthName(mm) +
+                            ") does not belong to quarter " + q + " (" + quarterLabel + "). Expected one of months: " + quarterMonths + ".");
+                }
+            }
+        }
+
         String fp = String.format("%s%04d", endMonthStr, y);
-        return new QuarterInfo(q, allowedMonths, fp, y, label);
+        return new QuarterInfo(q, allowedMonths, fp, y, label, effectivePeriod);
     }
 
     /**
@@ -230,7 +273,7 @@ public class MeeshoGstr1Service {
         String normalizedSellerState = StateCodeUtil.resolveStateCode(sellerStateCode);
 
         return executeProcessing(tcsSalesFile, tcsSalesReturnFile, taxInvoiceDetailsFile,
-                normalizedGstin, normalizedPeriod, normalizedSellerState, qi.allowedMonths, qi.year, qi.label);
+                normalizedGstin, normalizedPeriod, normalizedSellerState, qi.allowedMonths, qi.year, qi.label, qi.effectivePeriod);
     }
 
     private Gstr1Payload executeProcessing(MultipartFile tcsSalesFile,
@@ -242,6 +285,20 @@ public class MeeshoGstr1Service {
                                           Set<Integer> allowedMonths,
                                           int expectedYear,
                                           String periodLabel) {
+        return executeProcessing(tcsSalesFile, tcsSalesReturnFile, taxInvoiceDetailsFile,
+                normalizedGstin, normalizedPeriod, normalizedSellerState, allowedMonths, expectedYear, periodLabel, normalizedPeriod);
+    }
+
+    private Gstr1Payload executeProcessing(MultipartFile tcsSalesFile,
+                                          MultipartFile tcsSalesReturnFile,
+                                          MultipartFile taxInvoiceDetailsFile,
+                                          String normalizedGstin,
+                                          String normalizedPeriod,
+                                          String normalizedSellerState,
+                                          Set<Integer> allowedMonths,
+                                          int expectedYear,
+                                          String periodLabel,
+                                          String displayPeriod) {
         // 2. Aggregation buckets for Table 7 (B2CS), Table 12 (HSN), and Table 14 (supeco)
         Map<PosRateKey, ValueAccumulator> b2csMap = new LinkedHashMap<>();
         Map<HsnRateKey, HsnAccumulator> hsnMap = new LinkedHashMap<>();
@@ -250,13 +307,13 @@ public class MeeshoGstr1Service {
         // 3. Process Forward Sales (+1.0 multiplier) with in-file GSTIN and Month validation
         log.info("Processing Meesho TCS Sales report: {}", tcsSalesFile.getOriginalFilename());
         processReportData(tcsSalesFile, 1.0, normalizedSellerState, normalizedGstin,
-                allowedMonths, expectedYear, normalizedPeriod, periodLabel, b2csMap, hsnMap, supecoMap, "TCS Sales");
+                allowedMonths, expectedYear, displayPeriod, periodLabel, b2csMap, hsnMap, supecoMap, "TCS Sales");
 
         // 4. Process Sales Returns (-1.0 multiplier) with in-file GSTIN and Month validation
         if (tcsSalesReturnFile != null && !tcsSalesReturnFile.isEmpty()) {
             log.info("Processing Meesho TCS Sales Return report: {}", tcsSalesReturnFile.getOriginalFilename());
             processReportData(tcsSalesReturnFile, -1.0, normalizedSellerState, normalizedGstin,
-                    allowedMonths, expectedYear, normalizedPeriod, periodLabel, b2csMap, hsnMap, supecoMap, "TCS Sales Return");
+                    allowedMonths, expectedYear, displayPeriod, periodLabel, b2csMap, hsnMap, supecoMap, "TCS Sales Return");
         }
 
         // 5. Build Table 7: B2CS items
@@ -344,7 +401,7 @@ public class MeeshoGstr1Service {
         // 8. Build Table 13: Document summary (doc_issue) with month verification
         DocIssueContainer docIssueContainer = null;
         if (taxInvoiceDetailsFile != null && !taxInvoiceDetailsFile.isEmpty()) {
-            docIssueContainer = processDocIssue(taxInvoiceDetailsFile, allowedMonths, expectedYear, normalizedPeriod, periodLabel);
+            docIssueContainer = processDocIssue(taxInvoiceDetailsFile, allowedMonths, expectedYear, displayPeriod, periodLabel);
         }
 
         // 9. Assemble Root Payload
@@ -537,6 +594,19 @@ public class MeeshoGstr1Service {
                                     "'), but found month_number " + m + ". Please verify that the report matches the selected tax period.");
                         }
                     }
+                } else if (h.dateCol != -1) {
+                    String dateVal = getCellStringValue(row.getCell(h.dateCol), dataFormatter, formulaEvaluator);
+                    if (dateVal != null && !dateVal.trim().isEmpty()) {
+                        Matcher matcher = DATE_PATTERN.matcher(dateVal.trim());
+                        if (matcher.find()) {
+                            int m = Integer.parseInt(matcher.group(2));
+                            if (!allowedMonths.contains(m)) {
+                                throw new IllegalArgumentException("Filing month mismatch in file '" + file.getOriginalFilename() +
+                                        "' (row " + (r + 1) + "): expected " + periodLabel + " (from period '" + period +
+                                        "'), but found date with month " + m + ". Please verify that the report matches the selected tax period.");
+                            }
+                        }
+                    }
                 }
 
                 // 1. State / POS
@@ -648,6 +718,19 @@ public class MeeshoGstr1Service {
                                         "'), but found month_number " + m + ". Please verify that the report matches the selected tax period.");
                             }
                         } catch (NumberFormatException ignored) {}
+                    }
+                } else if (h.dateCol != -1) {
+                    String dateVal = getColValue(cols, h.dateCol);
+                    if (dateVal != null && !dateVal.trim().isEmpty()) {
+                        Matcher matcher = DATE_PATTERN.matcher(dateVal.trim());
+                        if (matcher.find()) {
+                            int m = Integer.parseInt(matcher.group(2));
+                            if (!allowedMonths.contains(m)) {
+                                throw new IllegalArgumentException("Filing month mismatch in file '" + file.getOriginalFilename() +
+                                        "' (row " + rowIdx + "): expected " + periodLabel + " (from period '" + period +
+                                        "'), but found date with month " + m + ". Please verify that the report matches the selected tax period.");
+                            }
+                        }
                     }
                 }
 
@@ -913,6 +996,7 @@ public class MeeshoGstr1Service {
                     (norm.contains("gstin") && !norm.contains("eco") && !norm.contains("tcs")))) h.gstinCol = i;
             else if (h.monthCol == -1 && (norm.equals("month_number") || norm.equals("month") || norm.contains("month_num"))) h.monthCol = i;
             else if (h.yearCol == -1 && (norm.equals("financial_year") || norm.equals("year"))) h.yearCol = i;
+            else if (h.dateCol == -1 && (norm.contains("order_date") || norm.contains("invoice_date") || norm.contains("manifest_date") || norm.equals("date"))) h.dateCol = i;
         }
         return h;
     }
@@ -1055,6 +1139,7 @@ public class MeeshoGstr1Service {
         int gstinCol = -1;
         int monthCol = -1;
         int yearCol = -1;
+        int dateCol = -1;
     }
 
     private static class ValueAccumulator {
