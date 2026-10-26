@@ -27,6 +27,7 @@ spring:
             scope: openid,profile,email
 server:
   port: ${PORT:8080}
+  forward-headers-strategy: native
 
 jwt:
   secret: ${JWT_SECRET}
